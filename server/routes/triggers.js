@@ -8,6 +8,7 @@ import {
   batchReadContacts,
   getContactIdsWithOpenDeals,
   EXCLUDED_STATUSES,
+  updateCompanyIntentSignal,
 } from "../services/hubspot.js";
 import { parseSlackMessages } from "../services/slackParser.js";
 import { fetchTodaysScan, isSlackConfigured } from "../services/slackClient.js";
@@ -58,6 +59,15 @@ router.post("/", async (req, res) => {
       const companyInfo = companyResults[0]?.properties || {};
       const unitCount = companyInfo.unit_count || "";
       const companyState = companyInfo.state || "";
+      const hsCompanyId = companyResults[0].id;
+
+      // Update intent signal on the COMPANY
+      let intentSignal = null;
+      try {
+        intentSignal = await updateCompanyIntentSignal(hsCompanyId, co.event);
+      } catch (err) {
+        console.error(`[Intent update] Company "${co.name}":`, err.message);
+      }
 
       const contactIds = await getContactIdsForCompanies(companyIds);
       if (!contactIds.length) continue;
@@ -87,6 +97,7 @@ router.post("/", async (req, res) => {
             event: co.event || "",
             source: co.source || "",
             date: today,
+            intentSignal,
           });
         });
     } catch (err) {
@@ -171,6 +182,14 @@ router.post("/scan-slack", async (req, res) => {
       const companyInfo = companyResults[0]?.properties || {};
       const unitCount = companyInfo.unit_count || "";
       const companyState = companyInfo.state || "";
+      const hsCompanyId = companyResults[0].id;
+
+      let intentSignal = null;
+      try {
+        intentSignal = await updateCompanyIntentSignal(hsCompanyId, co.event);
+      } catch (err) {
+        console.error(`[Intent update] Company "${co.name}":`, err.message);
+      }
 
       const contactIds = await getContactIdsForCompanies(companyIds);
       if (!contactIds.length) continue;
@@ -199,6 +218,7 @@ router.post("/scan-slack", async (req, res) => {
             event: co.event || "",
             source: co.source || "",
             date: today,
+            intentSignal,
           });
         });
     } catch (err) {
@@ -293,6 +313,14 @@ router.post("/auto-scan-slack", async (req, res) => {
         const companyInfo = companyResults[0]?.properties || {};
         const unitCount = companyInfo.unit_count || "";
         const companyState = companyInfo.state || "";
+        const hsCompanyId = companyResults[0].id;
+
+        let intentSignal = null;
+        try {
+          intentSignal = await updateCompanyIntentSignal(hsCompanyId, co.event);
+        } catch (err) {
+          console.error(`[Intent update] Company "${co.name}":`, err.message);
+        }
 
         const contactIds = await getContactIdsForCompanies(companyIds);
         if (!contactIds.length) continue;
@@ -321,6 +349,7 @@ router.post("/auto-scan-slack", async (req, res) => {
               event: co.event || "",
               source: co.source || "",
               date: today,
+              intentSignal,
             });
           });
       } catch (err) {

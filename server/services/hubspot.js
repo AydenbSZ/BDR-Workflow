@@ -29,6 +29,89 @@ async function hsPost(path, body) {
   return res.json();
 }
 
+async function hsPatch(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`HubSpot PATCH ${path} → ${res.status}: ${text}`);
+  }
+  return res.json();
+}
+
+// Maps raw event types to the 5 HubSpot dropdown values on the COMPANY object:
+// Acquisition, Expansion, Funding, Leadership Change, New Concept / Rebrand
+const INTENT_SIGNAL_MAP = {
+  "expansion": "Expansion",
+  "market expansion": "Expansion",
+  "franchise expansion": "Expansion",
+  "new franchise opening": "Expansion",
+  "closure": "Expansion",
+  "milestone": "Expansion",
+  "acquisition": "Acquisition",
+  "m&a": "Acquisition",
+  "asset sale": "Acquisition",
+  "bankruptcy": "Acquisition",
+  "acquisition / bankruptcy": "Acquisition",
+  "leadership change": "Leadership Change",
+  "leadership change (cfo)": "Leadership Change",
+  "operations change": "Leadership Change",
+  "technology adoption": "Leadership Change",
+  "earnings": "Funding",
+  "earnings / performance": "Funding",
+  "financial results": "Funding",
+  "financial decline": "Funding",
+  "financial results (raised guidance)": "Funding",
+  "funding": "Funding",
+  "business model update": "Funding",
+  "partnership": "Expansion",
+  "co-branding": "Expansion",
+  "rebrand": "New Concept / Rebrand",
+  "new franchise launch": "New Concept / Rebrand",
+  "new franchise concept": "New Concept / Rebrand",
+  "new product launch": "New Concept / Rebrand",
+};
+
+export function mapIntentSignal(rawEvent) {
+  if (!rawEvent) return null;
+  const lower = rawEvent.toLowerCase().trim();
+
+  if (INTENT_SIGNAL_MAP[lower]) return INTENT_SIGNAL_MAP[lower];
+
+  for (const [key, value] of Object.entries(INTENT_SIGNAL_MAP)) {
+    if (lower.includes(key) || key.includes(lower)) return value;
+  }
+
+  if (lower.includes("expan") || lower.includes("open") || lower.includes("grow")) return "Expansion";
+  if (lower.includes("acqui") || lower.includes("merge") || lower.includes("bankrupt") || lower.includes("sale")) return "Acquisition";
+  if (lower.includes("leader") || lower.includes("ceo") || lower.includes("cfo") || lower.includes("hire") || lower.includes("appoint")) return "Leadership Change";
+  if (lower.includes("earn") || lower.includes("fund") || lower.includes("financ") || lower.includes("ipo") || lower.includes("revenue")) return "Funding";
+  if (lower.includes("rebrand") || lower.includes("concept") || lower.includes("launch")) return "New Concept / Rebrand";
+  if (lower.includes("partner") || lower.includes("collab")) return "Expansion";
+
+  return "Expansion";
+}
+
+export async function updateCompanyIntentSignal(companyId, rawEvent) {
+  const signal = mapIntentSignal(rawEvent);
+  const today = new Date().toISOString().split("T")[0];
+  const dateValue = new Date(today + "T00:00:00.000Z").getTime();
+
+  await hsPatch(`/crm/v3/objects/companies/${companyId}`, {
+    properties: {
+      external_ai_intent_signal: signal,
+      intent_signal_date: dateValue,
+    },
+  });
+  return signal;
+}
+
 function shapeContact(result) {
   const p = result.properties || {};
   const first = p.firstname || "";

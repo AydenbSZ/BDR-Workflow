@@ -1,0 +1,17 @@
+Hi ,
+
+Was speaking with a few members of your team, and they mentioned using Buxton for their site selection and market planning — figured a quick comparison might be worth having on your radar.
+
+How SiteZeus is a better solution:
+
+Explainable analytics — Buxton operates as a black box, making it hard for internal teams to validate results. SiteZeus is built around AI-driven explainability so you always understand the why.
+
+Dynamic models — Buxton's models are static and don't recalibrate based on actual store performance. SiteZeus continuously adapts as new data comes in.
+
+Accounts for regionality — Buxton relies on linear regression, meaning a store in Florida is modeled the same as one in Illinois. SiteZeus accounts for regional differences in performance.
+
+Speed — Buxton requires weeks or months of setup. SiteZeus can stand up a proof of concept in as little as 36 hours.
+
+Would love to show you how we're different, even if it's just something to keep in mind for the future or when your contract is up. What does your schedule look like later this week for a quick conversation?
+
+Best,

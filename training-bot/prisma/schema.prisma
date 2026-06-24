@@ -1,0 +1,427 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TRAINEE
+}
+
+enum TranscriptStatus {
+  AVAILABLE
+  BODY_ONLY
+  RECORDING_ONLY
+  MISSING
+  ERROR
+}
+
+enum SpeakerRole {
+  BDR
+  PROSPECT
+  UNKNOWN
+}
+
+enum MessageRole {
+  TRAINER
+  TRAINEE
+  SYSTEM
+}
+
+enum SourceType {
+  HUBSPOT_CALL
+  GONG_CALL
+  UPLOADED_DOC
+  MANUAL
+  RULE
+  COMPANY_CONTEXT
+}
+
+enum CallType {
+  COLD_CALL
+  DISCOVERY
+  DEMO
+}
+
+enum Persona {
+  CHIEF_DEVELOPMENT_OFFICER
+  DIRECTOR_OF_REAL_ESTATE
+  DIRECTOR_OF_FRANCHISE_DEVELOPMENT
+  OTHER
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model User {
+  id               String           @id @default(cuid())
+  name             String?
+  email            String           @unique
+  hashedPassword   String?
+  role             UserRole         @default(TRAINEE)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  practiceSessions PracticeSession[]
+}
+
+model HubSpotOwner {
+  id             String   @id @default(cuid())
+  hubspotOwnerId String   @unique
+  hubspotUserId  String?
+  email          String?
+  firstName      String?
+  lastName       String?
+  teamName       String?
+  isCurrentBdr   Boolean  @default(false)
+  archived       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model HubSpotCall {
+  id                     String              @id @default(cuid())
+  hubspotCallId          String              @unique
+  hubspotOwnerId         String?
+  ownerName              String?
+  outcomeLabel           String?
+  outcomeId              String?
+  title                  String?
+  body                   String?             @db.Text
+  durationMs             Int?
+  direction              String?
+  status                 String?
+  timestamp              DateTime?
+  recordingUrl           String?
+  transcriptId           String?
+  transcriptStatus       TranscriptStatus    @default(MISSING)
+  associatedContactName  String?
+  associatedContactTitle String?
+  associatedContactEmail String?
+  associatedCompanyName  String?
+  associatedCompanyDomain String?
+  personaGuess           Persona             @default(OTHER)
+  approved               Boolean             @default(false)
+  excluded               Boolean             @default(false)
+  rawJson                Json?
+  syncError              String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  utterances             TranscriptUtterance[]
+  knowledgeDocuments     KnowledgeDocument[]
+}
+
+model TranscriptUtterance {
+  id              String      @id @default(cuid())
+  callId          String
+  call            HubSpotCall @relation(fields: [callId], references: [id], onDelete: Cascade)
+  speakerId       String?
+  speakerName     String?
+  speakerEmail    String?
+  speakerRole     SpeakerRole @default(UNKNOWN)
+  text            String      @db.Text
+  startTimeMillis Int?
+  endTimeMillis   Int?
+  createdAt       DateTime    @default(now())
+}
+
+model KnowledgeDocument {
+  id          String     @id @default(cuid())
+  sourceType  SourceType
+  title       String
+  content     String     @db.Text
+  persona     Persona?
+  tags        String[]   @default([])
+  metadataJson Json?
+  callId      String?
+  call        HubSpotCall? @relation(fields: [callId], references: [id], onDelete: SetNull)
+  gongCallId  String?
+  gongCall    GongCall?  @relation(fields: [gongCallId], references: [id], onDelete: SetNull)
+  approved    Boolean    @default(true)
+  excluded    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  chunks      KnowledgeChunk[]
+}
+
+model GongCall {
+  id                String              @id @default(cuid())
+  gongCallId        String              @unique
+  title             String?
+  url               String?
+  callType          CallType            @default(DISCOVERY)
+  callTypeConfidence String?
+  durationSec       Int?
+  callDate          DateTime?
+  participantsJson  Json?
+  transcript        String?             @db.Text
+  transcriptStatus  TranscriptStatus    @default(MISSING)
+  rawJson           Json?
+  approved          Boolean             @default(true)
+  excluded          Boolean             @default(false)
+  syncError         String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  knowledgeDocuments KnowledgeDocument[]
+}
+
+model KnowledgeChunk {
+  id          String            @id @default(cuid())
+  documentId  String
+  document    KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  content     String            @db.Text
+  embeddingJson Json?
+  persona     Persona?
+  tags        String[]          @default([])
+  metadataJson Json?
+  createdAt   DateTime          @default(now())
+}
+
+model RuleSet {
+  id                 String   @id @default(cuid())
+  name               String
+  isActive           Boolean  @default(true)
+  scoringJson        Json?
+  requiredKeywordsJson Json?
+  bannedPhrasesJson  Json?
+  objectionRulesJson Json?
+  rubricJson         Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model CompanyContext {
+  id                    String   @id @default(cuid())
+  isActive              Boolean  @default(true)
+  positioning           String?  @db.Text
+  valuePropsJson        Json?
+  personasJson          Json?
+  competitorNotesJson   Json?
+  discoveryQuestionsJson Json?
+  keywordsJson          Json?
+  cautionPhrasesJson    Json?
+  openersJson           Json?
+  closesJson            Json?
+  aiNotesJson           Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model HubSpotDisposition {
+  id         String  @id @default(cuid())
+  label      String
+  internalId String  @unique
+  isSelected Boolean @default(false)
+}
+
+model PracticeSession {
+  id                String           @id @default(cuid())
+  traineeId         String
+  trainee           User             @relation(fields: [traineeId], references: [id], onDelete: Cascade)
+  callType          CallType         @default(COLD_CALL)
+  persona           Persona
+  difficulty        Difficulty       @default(MEDIUM)
+  scenario          String?
+  companyName       String?
+  industryContext    String?
+  scenarioJson      Json?
+  transcriptJson    Json?
+  score             Int?
+  scoreBreakdownJson Json?
+  feedbackMarkdown  String?          @db.Text
+  earnedMeeting     Boolean?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  messages          PracticeMessage[]
+}
+
+model PracticeMessage {
+  id        String          @id @default(cuid())
+  sessionId String
+  session   PracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      MessageRole
+  content   String          @db.Text
+  createdAt DateTime        @default(now())
+}
+
+model SyncLog {
+  id          String   @id @default(cuid())
+  type        String
+  status      String
+  details     Json?
+  callsFound  Int      @default(0)
+  callsImported Int    @default(0)
+  callsSkipped Int     @default(0)
+  errors      Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// ─── BDR Bot: Prospecting Automation ─────────────────────────────────
+
+enum ProspectStatus {
+  NEW
+  RESEARCHED
+  QUALIFIED
+  OUTREACH
+  MEETING_BOOKED
+  DISQUALIFIED
+  NURTURE
+}
+
+enum SignalType {
+  EXPANSION_ANNOUNCEMENT
+  FRANCHISE_GROWTH
+  FUNDING_ROUND
+  PE_ACQUISITION
+  DEVELOPMENT_HIRING
+  NEW_MARKET_ENTRY
+  LOCATION_CLOSURE
+  EXECUTIVE_HIRE
+  NEWS_MENTION
+}
+
+enum OutreachType {
+  EMAIL
+  LINKEDIN
+  CALL
+}
+
+enum OutreachStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SENT
+  FAILED
+}
+
+enum AgentStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model ProspectAccount {
+  id                String              @id @default(cuid())
+  name              String
+  domain            String?
+  industry          String?
+  subIndustry       String?
+  locationCount     Int?
+  headquarters      String?
+  annualRevenue     String?
+  employeeCount     Int?
+  expansionScore    Int?
+  status            ProspectStatus      @default(NEW)
+  hubspotCompanyId  String?             @unique
+  apolloOrgId       String?
+  notes             String?             @db.Text
+  lastResearchedAt  DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  contacts          ProspectContact[]
+  signals           ExpansionSignal[]
+  qualifications    QualificationScore[]
+}
+
+model ProspectContact {
+  id                  String          @id @default(cuid())
+  accountId           String
+  account             ProspectAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  firstName           String?
+  lastName            String?
+  title               String?
+  email               String?
+  phone               String?
+  linkedinUrl         String?
+  apolloContactId     String?
+  hubspotContactId    String?         @unique
+  personalizationJson Json?
+  tenure              String?
+  seniority           String?
+  isPrimary           Boolean         @default(false)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  outreachItems       OutreachQueue[]
+}
+
+model ExpansionSignal {
+  id          String          @id @default(cuid())
+  accountId   String
+  account     ProspectAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  type        SignalType
+  source      String
+  title       String
+  description String?         @db.Text
+  url         String?
+  confidence  Int?
+  signalDate  DateTime?
+  createdAt   DateTime        @default(now())
+}
+
+model OutreachQueue {
+  id              String          @id @default(cuid())
+  contactId       String
+  contact         ProspectContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  type            OutreachType
+  subject         String?
+  content         String          @db.Text
+  status          OutreachStatus  @default(PENDING)
+  rejectionReason String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  sentAt          DateTime?
+  sendError       String?
+  agentRunId      String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model QualificationScore {
+  id                String          @id @default(cuid())
+  accountId         String
+  account           ProspectAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  score             Int
+  positiveSignals   Json?
+  negativeSignals   Json?
+  reasoning         String?         @db.Text
+  recommendedAction String?
+  createdAt         DateTime        @default(now())
+}
+
+model AgentRun {
+  id              String      @id @default(cuid())
+  agentName       String
+  status          AgentStatus @default(RUNNING)
+  triggeredBy     String?
+  inputSummary    String?     @db.Text
+  outputSummary   String?     @db.Text
+  accountsFound   Int         @default(0)
+  contactsFound   Int         @default(0)
+  errorsCount     Int         @default(0)
+  errorDetails    Json?
+  startedAt       DateTime    @default(now())
+  completedAt     DateTime?
+}
+
+model DailyBriefing {
+  id            String   @id @default(cuid())
+  date          DateTime @unique
+  tier1Json     Json?
+  tier2Json     Json?
+  tier3Json     Json?
+  callListJson  Json?
+  emailListJson Json?
+  followUpsJson Json?
+  slackSent     Boolean  @default(false)
+  generatedBy   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
